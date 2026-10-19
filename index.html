@@ -1,0 +1,922 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>米倉庫 在庫管理</title>
+<style>
+*{box-sizing:border-box}
+body{margin:0;font-family:"Noto Sans CJK JP","Noto Sans JP","Hiragino Sans","Hiragino Kaku Gothic ProN","Yu Gothic",Meiryo,sans-serif;background:#f4f4ef;color:#222;font-size:15px}
+header{background:#3b5d3a;color:#fff;padding:10px 14px}
+header h1{margin:0;font-size:20px}
+.tabs{display:flex;gap:4px;background:#3b5d3a;padding:0 10px;flex-wrap:wrap}
+.tabs button{border:0;background:#5d7f5b;color:#fff;padding:10px 16px;font-size:15px;border-radius:8px 8px 0 0;cursor:pointer;font-family:inherit}
+.tabs button.on{background:#f4f4ef;color:#222;font-weight:bold}
+main{padding:12px;max-width:1500px;margin:0 auto}
+section.card{background:#fff;border-radius:10px;padding:14px;margin-bottom:14px;box-shadow:0 1px 3px rgba(0,0,0,.12)}
+h2{font-size:18px;margin:0 0 10px}
+h3{font-size:16px;margin:12px 0 6px}
+label{display:inline-block;margin:4px 12px 4px 0}
+input,select,textarea,button{font-family:inherit;font-size:15px}
+input[type=text],input[type=number],input[type=date],select{padding:6px 8px;border:1px solid #aaa;border-radius:6px;min-height:36px}
+.btn{padding:7px 14px;border-radius:6px;border:1px solid #888;background:#fff;cursor:pointer;min-height:36px}
+.btn.pri{background:#3b5d3a;color:#fff;border-color:#3b5d3a}
+.btn.warn{background:#fff3f0;color:#b03a2e;border-color:#d98b80}
+.btn.sm{padding:3px 9px;min-height:28px;font-size:13px}
+.row{display:flex;flex-wrap:wrap;align-items:flex-end;gap:6px 10px}
+.row>label{display:flex;flex-direction:column;font-size:13px;color:#444;margin:0}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{border-bottom:1px solid #ddd;padding:6px 6px;text-align:left;vertical-align:top}
+th{background:#eef1ea;white-space:nowrap}
+td.num,th.num{text-align:right;white-space:nowrap}
+.tblwrap{overflow-x:auto}
+.sw{display:inline-block;width:16px;height:16px;border-radius:50%;border:1.5px solid #333;vertical-align:-3px;margin-right:4px}
+.in{color:#1d6fb8;font-weight:bold}.out{color:#b5562a;font-weight:bold}
+.warnbox{background:#fff3f0;border:1px solid #e3a59b;color:#a32f22;border-radius:8px;padding:8px 12px;margin:8px 0}
+.okbox{background:#eef7ec;border:1px solid #a9d3a2;color:#2d6a27;border-radius:8px;padding:6px 12px;margin:8px 0;font-size:13px}
+.samplebar{background:#fff7d6;border:1px solid #e3c65a;border-radius:8px;padding:8px 12px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.muted{color:#777;font-size:13px}
+.plans{display:flex;gap:16px;align-items:flex-start;flex-wrap:wrap}
+.plans .pm{flex:800 1 360px;min-width:0}
+.plans .ps{flex:1000 1 420px;min-width:0}
+.plans svg{width:100%;height:auto;display:block;background:#fff;border-radius:8px}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;margin:8px 0}
+.legend span{white-space:nowrap}
+.datenav{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.datenav input[type=range]{flex:1 1 200px}
+.bigdate{font-size:20px;font-weight:bold}
+.stockcards{display:flex;flex-wrap:wrap;gap:8px}
+.stockcards div{border:1px solid #ccc;border-radius:8px;padding:6px 10px;background:#fafaf7}
+ul.log{margin:4px 0;padding-left:20px;font-size:14px}
+ul.log li.w{color:#a32f22}
+tr.editing td{background:#fffbe0}
+tr.wrow td{background:#fff3f0}
+#lock{position:fixed;inset:0;background:#3b5d3a;display:flex;align-items:center;justify-content:center;padding:16px;z-index:50;overflow:auto}
+#lock .box{background:#fff;border-radius:12px;padding:20px;max-width:440px;width:100%;box-shadow:0 4px 20px rgba(0,0,0,.3)}
+#lock h2{font-size:20px}
+#lock input[type=password]{width:100%;margin:4px 0 10px;font-size:16px}
+#lock .err{color:#a32f22;min-height:1.4em;font-size:14px}
+.modal{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:16px;z-index:60}
+.modal .box{background:#fff;border-radius:12px;padding:18px;max-width:420px;width:100%}
+.modal input[type=password]{width:100%;margin:6px 0 10px;font-size:16px}
+header{display:flex;align-items:center;justify-content:space-between;gap:8px}
+header .btn{background:#fff;color:#3b5d3a;border-color:#fff}
+@media (max-width:700px){
+ #e-table{min-width:560px} #p-table{min-width:680px} #p-table td{white-space:nowrap}
+ main{padding:8px} .tabs button{padding:8px 10px;font-size:14px}
+ th,td{padding:5px 4px;font-size:13px}
+ .hide-sm{display:none}
+}
+</style>
+</head>
+<body>
+<div id="lock"><div class="box" id="lockbox">読み込み中…</div></div>
+<div id="app" style="display:none">
+<header><h1>🌾 米倉庫 在庫管理</h1><button class="btn sm" id="lockbtn" title="すぐにロックする">🔒 ロック</button></header>
+<nav class="tabs">
+ <button data-tab="master">マスター</button>
+ <button data-tab="entry">入出荷入力</button>
+ <button data-tab="plan">配置図</button>
+ <button data-tab="data">データ</button>
+</nav>
+<main>
+<div id="samplebar"></div>
+
+<!-- マスター -->
+<div id="tab-master" class="tab">
+ <section class="card">
+  <h2 id="vform-title">品種を登録</h2>
+  <div class="row">
+   <label>品種名<input type="text" id="v-name" placeholder="例: a米" style="width:150px"></label>
+   <label>精米歩合 (%)<input type="number" id="v-polish" min="0" max="100" step="0.1" placeholder="例: 70" style="width:100px"></label>
+   <label>色<input type="color" id="v-color" style="width:60px;height:36px;padding:2px"></label>
+   <label>メモ<input type="text" id="v-memo" style="width:200px"></label>
+   <label style="flex-direction:row;align-items:center;gap:4px;font-size:14px"><input type="checkbox" id="v-bulk"> 大量入荷予定（メイン倉庫を優先）</label>
+  </div>
+  <div class="row" style="margin-top:8px">
+   <button class="btn pri" id="v-save">登録</button>
+   <button class="btn" id="v-cancel" style="display:none">編集をやめる</button>
+  </div>
+  <p class="muted">品種名は置き場所の記号（A〜G）とまぎらわしくないように、小文字や名前で付けてください（例: a米、b米、コシヒカリ）。</p>
+ </section>
+ <section class="card">
+  <h2>品種一覧</h2>
+  <div class="tblwrap"><table id="v-table"></table></div>
+ </section>
+</div>
+
+<!-- 入出荷 -->
+<div id="tab-entry" class="tab">
+ <section class="card">
+  <h2 id="eform-title">入出荷を入力</h2>
+  <div class="row">
+   <label>日付<input type="date" id="e-date"></label>
+   <label>品種<select id="e-v" style="min-width:130px"></select></label>
+   <label>区分<select id="e-type"><option value="in">入荷</option><option value="out">出荷</option></select></label>
+   <label>数量 (kg)<input type="number" id="e-kg" min="0" step="any" style="width:120px" placeholder="例: 1250.5"></label>
+   <label>メモ<input type="text" id="e-memo" style="width:180px"></label>
+  </div>
+  <div class="row" style="margin-top:8px">
+   <button class="btn pri" id="e-save">追加</button>
+   <button class="btn" id="e-cancel" style="display:none">編集をやめる</button>
+  </div>
+  <div id="e-msg"></div>
+ </section>
+ <section class="card">
+  <h2>現在の在庫（全データ反映後）</h2>
+  <div class="stockcards" id="e-stock"></div>
+ </section>
+ <section class="card">
+  <h2>入出荷の一覧（日付順）</h2>
+  <div class="tblwrap"><table id="e-table"></table></div>
+ </section>
+</div>
+
+<!-- 配置図 -->
+<div id="tab-plan" class="tab">
+ <section class="card">
+  <div class="datenav">
+   <button class="btn" id="p-prev">◀ 前の日</button>
+   <select id="p-date"></select>
+   <button class="btn" id="p-next">次の日 ▶</button>
+   <input type="range" id="p-range" min="0" max="0" value="0">
+  </div>
+  <div style="margin-top:8px"><span class="bigdate" id="p-title"></span> <span class="muted">の終わりの在庫</span></div>
+  <div id="p-warn"></div>
+  <div class="legend" id="p-legend"></div>
+  <div class="muted" style="line-height:1.7">色の<b>濃い＝古い入荷</b>／<b>薄い＝新しい入荷</b>（同じ品種は同じ色の系統）。<span style="display:inline-block;width:14px;height:14px;border:2px dashed #222;border-radius:50%;vertical-align:-2px"></span> <b>点線の丸＝満杯（2段1,000kg）でない場所</b>。<span style="display:inline-block;width:14px;height:14px;border:3px solid #d62d20;border-radius:50%;vertical-align:-2px"></span> 赤い外枠＝この日に変わった場所。丸の下の日付は入荷日。各列とも扉・通路側（メイン倉庫は番号が大きいほう、サブ倉庫はD5・E5・F4・G1の側）が手前。</div>
+ </section>
+ <section class="card">
+  <h2 style="text-align:center;margin-bottom:2px">倉庫 在庫一覧</h2>
+  <div style="text-align:center;margin-bottom:8px" id="p-total"></div>
+  <div class="plans"><div class="pm" id="p-main"></div><div class="ps" id="p-sub"></div></div>
+ </section>
+ <section class="card">
+  <h2>在庫のまとめ</h2>
+  <div class="tblwrap"><table id="p-table"></table></div>
+  <div id="p-free" style="margin-top:8px"></div>
+ </section>
+ <section class="card">
+  <h2>この日の動き</h2>
+  <ul class="log" id="p-log"></ul>
+ </section>
+</div>
+
+<!-- データ -->
+<div id="tab-data" class="tab">
+ <section class="card">
+  <h2>バックアップ・移動</h2>
+  <p class="muted">データはこのブラウザの中（localStorage）に<b>暗号化して</b>保存されています。別のパソコンやスマホに移すときは、JSONに書き出して移したい先で読み込むか、「データ込みで保存」で作ったHTMLファイルを渡してください。書き出したファイルも暗号化されていて、開くには<b>書き出したときのパスワード</b>が要ります。</p>
+  <div class="warnbox">⚠ パスワードを忘れると、データは<b>だれにも（作った人にも）元に戻せません</b>。パスワードは安全な場所に控え、暗号化したバックアップ（JSON）をときどき書き出しておいてください。</div>
+  <div class="row">
+   <button class="btn pri" id="d-export">JSONに書き出す（暗号化）</button>
+   <button class="btn" id="d-import">JSONを読み込む</button>
+   <button class="btn" id="d-bundle">データ込みで保存（HTML・暗号化）</button>
+   <input type="file" id="d-file" accept=".json,application/json" style="display:none">
+  </div>
+ </section>
+ <section class="card">
+  <h2>パスワードの変更</h2>
+  <div class="row">
+   <label>今のパスワード<input type="password" id="pw-cur" autocomplete="current-password"></label>
+   <label>新しいパスワード（8文字以上）<input type="password" id="pw-new" autocomplete="new-password"></label>
+   <label>新しいパスワード（もう一度）<input type="password" id="pw-new2" autocomplete="new-password"></label>
+   <button class="btn pri" id="pw-change">変更する</button>
+  </div>
+  <div id="pw-msg"></div>
+  <p class="muted">変更すると、このブラウザのデータは新しいパスワードで暗号化しなおします。前に書き出したファイルは、書き出したときのパスワードのままです。何も操作しないまま10分たつと自動でロックします。</p>
+ </section>
+ <section class="card">
+  <h2>お試し用</h2>
+  <p class="muted">5品種・5日分の例のデータ（中身は架空です。同じ品種で入荷日のちがう米＝ロットが複数あります）を入れて、使い方を試せます。「サンプルを消す」でいつでも消せます。</p>
+  <div class="row">
+   <button class="btn" id="d-sample">サンプルデータを入れる</button>
+   <button class="btn" id="d-clearsample">サンプルを消す</button>
+  </div>
+ </section>
+ <section class="card">
+  <h2>リセット</h2>
+  <p class="muted">品種と入出荷のデータを全部消して、空っぽの状態に戻します。</p>
+  <button class="btn warn" id="d-reset">全部リセット</button>
+ </section>
+ <section class="card">
+  <h2>置き方のルール</h2>
+  <ul class="log">
+   <li>1袋は最大500kg、1か所に2段まで（1か所最大1,000kg）。メイン倉庫42袋、サブ倉庫36袋、合計78袋（39,000kg）。</li>
+   <li>置き場所はすき間なく並ぶので、各列で取り出せるのは一番手前の上段の袋だけ。</li>
+   <li>1列に1品種。列の奥から2段ずつ詰める。列は A・B・C（メイン）、D・E・F・G（サブ）の7本。</li>
+   <li><b>入荷1件＝1ロット</b>（入荷日で区別）。1袋に入るのは1つのロットだけで、ちがうロットの米を混ぜない。前のロットの端数の袋に足すこともしない。</li>
+   <li>端数の袋（500kg未満）は1ロットに1つまでで、そのロットの一番手前の上段に置く。</li>
+   <li><b>新しいロットは空いている列に置く</b>（同じ品種の古い米の手前に置くと、古い米が先に出せなくなるため）。空いている列がないときだけ同じ品種の列の手前に置き、「古い米が奥になり先に出せません」と警告する。ちがう品種は同じ列に入れない。</li>
+   <li>「大量入荷予定」の品種はメイン倉庫。印がないときは一番量の多い品種がメイン倉庫。ほかはサブ倉庫で、量に合う短い列（F・Gなど）から使う。</li>
+   <li><b>出荷は先入れ先出し</b>：取り出せる袋（各列の一番手前の上段）のうち、いちばん古いロットから、端数の袋を先に取る。いちばん古いロットが奥でふさがれているときは警告して、取り出せる中で一番古いロットから取る。</li>
+   <li>図の色：同じ品種は同じ色の系統で、古いロットほど濃く、新しいほど薄い。点線の丸は満杯でない場所。</li>
+  </ul>
+ </section>
+</div>
+</main>
+</div>
+<input type="hidden" id="dummy">
+<script type="application/json" id="embedded-data"></script>
+<script>
+"use strict";
+/* ===================== 定数 ===================== */
+const ORIGINAL_HTML = "<!DOCTYPE html>\n" + document.documentElement.outerHTML;   // 起動直後の自分自身（データ込み保存用）
+const STORE_KEY = "soko_app_v1";          // 古い版（暗号化なし）のキー。見つけたら暗号化して消す
+const ENC_KEY = "soko_app_enc_v1";        // 暗号化したデータ
+const FAIL_KEY = "soko_app_lockout";      // パスワード間違いの回数
+const PBKDF2_ITER = 310000;
+const IDLE_MS = 10*60*1000;
+const BAG = 500000;              // 1袋の最大（グラム）
+const PAL = ["#7fb8f0","#f4a62a","#8fd48a","#e88fb4","#b59cf0","#f2d94e","#6fd3d0","#d9a07a","#a3a3f5","#c7e36b"];
+// 各列: 奥→手前の順
+const LANES = [
+ {id:"A", wh:"main", spots:["A1","A2","A3","A4","A5"]},
+ {id:"B", wh:"main", spots:["B1","B2","B3","B4","B5","B6","B7","B8"]},
+ {id:"C", wh:"main", spots:["C1","C2","C3","C4","C5","C6","C7","C8"]},
+ {id:"D", wh:"sub",  spots:["D1","D2","D3","D4","D5"]},
+ {id:"E", wh:"sub",  spots:["E1","E2","E3","E4","E5"]},
+ {id:"F", wh:"sub",  spots:["F1","F2","F3","F4"]},
+ {id:"G", wh:"sub",  spots:["G4","G3","G2","G1"]},
+];
+const WHNAME = {main:"メイン倉庫", sub:"サブ倉庫"};
+const CAP = {main:42, sub:36};
+
+/* ===================== データ ===================== */
+let db = emptyDb();
+function emptyDb(){ return {version:1, varieties:[], entries:[], seq:1}; }
+/* ===================== 暗号化（WebCrypto: PBKDF2-SHA256 → AES-GCM 256bit） ===================== */
+const HAS_CRYPTO = !!(window.crypto && crypto.subtle && window.isSecureContext !== false);
+let sess = null;   // {key, salt, iter}  ロック中は null
+let saveQ = Promise.resolve();
+function b64(u8){ let s=""; for(let i=0;i<u8.length;i+=0x8000) s+=String.fromCharCode.apply(null,u8.subarray(i,i+0x8000)); return btoa(s); }
+function unb64(t){ const s=atob(t); const u=new Uint8Array(s.length); for(let i=0;i<s.length;i++) u[i]=s.charCodeAt(i); return u; }
+async function deriveKey(pw, salt, iter){
+ const base = await crypto.subtle.importKey("raw", new TextEncoder().encode(pw), "PBKDF2", false, ["deriveKey"]);
+ return crypto.subtle.deriveKey({name:"PBKDF2", salt, iterations:iter, hash:"SHA-256"}, base, {name:"AES-GCM", length:256}, false, ["encrypt","decrypt"]);
+}
+async function sealWith(s, obj){
+ const iv = crypto.getRandomValues(new Uint8Array(12));
+ const ct = new Uint8Array(await crypto.subtle.encrypt({name:"AES-GCM", iv}, s.key, new TextEncoder().encode(JSON.stringify(obj))));
+ return {app:"soko", v:1, kdf:"PBKDF2-SHA256", iter:s.iter, salt:b64(s.salt), iv:b64(iv), ct:b64(ct)};
+}
+async function openEnv(env, pw){   // 失敗したら例外
+ if(!env || env.app!=="soko" || !env.ct) throw new Error("形式がちがいます");
+ const salt = unb64(env.salt), iter = env.iter|0;
+ if(iter < 100000) throw new Error("形式がちがいます");
+ const key = await deriveKey(pw, salt, iter);
+ let pt;
+ try{ pt = await crypto.subtle.decrypt({name:"AES-GCM", iv:unb64(env.iv)}, key, unb64(env.ct)); }
+ catch(e){ const er = new Error("パスワードがちがいます"); er.badpw = true; throw er; }
+ const d = JSON.parse(new TextDecoder().decode(pt));
+ if(!d || !Array.isArray(d.varieties) || !Array.isArray(d.entries)) throw new Error("形式がちがいます");
+ return {db:d, sess:{key, salt, iter}};
+}
+async function newSession(pw){ const salt = crypto.getRandomValues(new Uint8Array(16)); return {key: await deriveKey(pw, salt, PBKDF2_ITER), salt, iter:PBKDF2_ITER}; }
+function save(){
+ if(!sess) return saveQ;
+ const s = sess, snapshot = JSON.parse(JSON.stringify(db));
+ saveQ = saveQ.then(async()=>{ const env = await sealWith(s, snapshot); localStorage.setItem(ENC_KEY, JSON.stringify(env)); })
+  .catch(e=>alert("保存できませんでした: "+e.message));
+ return saveQ;
+}
+function readEnc(){ try{ const t=localStorage.getItem(ENC_KEY); return t? JSON.parse(t) : null; }catch(e){ return null; } }
+function readEmbedded(){ try{ const t=document.getElementById("embedded-data").textContent.trim(); return t? JSON.parse(t) : null; }catch(e){ return null; } }
+function readLegacy(){ try{ const t=localStorage.getItem(STORE_KEY); if(t){ const d=JSON.parse(t); if(d && Array.isArray(d.varieties)) return d; } }catch(e){} return null; }
+function getFail(){ try{ return JSON.parse(localStorage.getItem(FAIL_KEY)) || {n:0, until:0}; }catch(e){ return {n:0, until:0}; } }
+function setFail(f){ localStorage.setItem(FAIL_KEY, JSON.stringify(f)); }
+function sleep(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+/* ---------- ロック画面 ---------- */
+const FORGET_WARN = `<div class="warnbox" style="font-size:13px">⚠ パスワードを忘れると、データは<b>だれにも元に戻せません</b>（パスワードを取り戻す方法はありません）。パスワードは安全な場所に控え、暗号化したバックアップをときどき書き出してください。</div>`;
+function showLock(html){ $("app").style.display="none"; $("lock").style.display="flex"; $("lockbox").innerHTML = html; const i=$("lockbox").querySelector("input"); if(i) i.focus(); }
+function hideLock(){ $("lock").style.display="none"; $("lockbox").innerHTML=""; $("app").style.display=""; }
+function lockScreen(msg){
+ if(!HAS_CRYPTO){
+  showLock(`<h2>🔒 この環境では開けません</h2><p>このブラウザでは、ファイルを直接開いたときに暗号化の機能（Web Crypto）が使えないため、データを安全に保存できません。<b>暗号化しないで保存することはしません。</b></p><p class="muted">パソコンの Chrome / Edge / Firefox で開いてください。スマホの場合は README の「スマホで使うとき」を見てください。</p>`);
+  return;
+ }
+ const local = readEnc(), emb = readEmbedded();
+ if(!local && !emb){ setupScreen(); return; }
+ let choice = "";
+ if(emb && local && emb.ct !== local.ct){
+  choice = `<div style="margin:8px 0;font-size:14px"><label style="display:block"><input type="radio" name="src" value="file" checked> このファイルに入っているデータ${emb.savedAt?`（${esc(emb.savedAt)} 保存）`:""}</label><label style="display:block"><input type="radio" name="src" value="local"> このブラウザに保存されているデータ</label></div>`;
+ }
+ const what = (emb && !local) ? "このファイルにはデータが入っています。保存した人が決めたパスワードを入れてください。" : "パスワードを入れてください。";
+ showLock(`<h2>🔒 米倉庫 在庫管理</h2>${msg?`<div class="okbox">${esc(msg)}</div>`:""}<p>${what}</p>${choice}
+  <form id="unlockf"><input type="password" id="unlock-pw" autocomplete="current-password" placeholder="パスワード"><button class="btn pri" id="unlock-btn" style="width:100%">開く</button></form>
+  <div class="err" id="unlock-err"></div>${FORGET_WARN}
+  <p style="text-align:right;margin:4px 0 0"><button type="button" class="btn sm warn" id="forgot-btn">パスワードを忘れた（このブラウザのデータを消して最初から）</button></p>`);
+ $("unlockf").onsubmit = ev=>{ ev.preventDefault(); doUnlock(); };
+ $("forgot-btn").onclick = ()=>{
+  if(!confirm("パスワードがわからないと、データは元に戻せません。\nこのブラウザに保存されている暗号化データを消して、新しいパスワードで最初から始めますか？")) return;
+  if(!confirm("本当に消しますか？消したデータは戻りません。")) return;
+  localStorage.removeItem(ENC_KEY); setFail({n:0,until:0});
+  if(readEmbedded()) alert("このブラウザのデータを消しました。このファイルに入っているデータは、保存した人のパスワードで開けます。");
+  lockScreen();
+ };
+ tickFail();
+}
+let failTimer=null;
+function tickFail(){
+ clearInterval(failTimer);
+ const upd=()=>{ const f=getFail(), b=$("unlock-btn"); if(!b) return clearInterval(failTimer);
+  const wait=Math.ceil((f.until-Date.now())/1000);
+  if(wait>0){ b.disabled=true; b.textContent=`${wait}秒待ってください`; } else { b.disabled=false; b.textContent="開く"; clearInterval(failTimer); } };
+ upd(); failTimer=setInterval(upd,500);
+}
+async function doUnlock(){
+ const f0=getFail(); if(f0.until>Date.now()) return;
+ const pw=$("unlock-pw").value; if(!pw) return;
+ const b=$("unlock-btn"); b.disabled=true; b.textContent="確認中…"; $("unlock-err").textContent="";
+ const local=readEnc(), emb=readEmbedded();
+ const r=document.querySelector('input[name=src]:checked');
+ const useFile = emb && (!local || (r ? r.value==="file" : emb.ct!==local.ct));
+ const env = useFile ? emb : local;
+ try{
+  const o = await openEnv(env, pw);
+  setFail({n:0, until:0});
+  if(useFile && local && local.ct!==emb.ct){
+   if(!confirm("このブラウザに保存されているデータを、このファイルのデータで置きかえます。よろしいですか？\n（このブラウザのデータを残したいときは「キャンセル」を押して、先にそちらを開いて書き出してください）")){ lockScreen(); return; }
+  }
+  db=o.db; sess=o.sess;
+  if(useFile){ const e2={...emb}; delete e2.savedAt; localStorage.setItem(ENC_KEY, JSON.stringify(e2)); }
+  startApp();
+ }catch(e){
+  await sleep(800);   // 1回ごとに少し待たせる
+  if(e.badpw){
+   const f=getFail(); f.n++; if(f.n>=3) f.until = Date.now() + Math.min(300, 2**(f.n-3)*5)*1000; setFail(f);
+   $("unlock-err").textContent = `パスワードがちがいます（${f.n}回目）` + (f.n>=3 ? "。続けてまちがえると待ち時間が長くなります。" : "");
+  } else $("unlock-err").textContent = "開けませんでした: "+e.message;
+  $("unlock-pw").value=""; tickFail();
+ }
+}
+function setupScreen(){
+ const legacy = readLegacy();
+ showLock(`<h2>🔒 パスワードを決めてください</h2><p style="font-size:14px">はじめて使うときに、データを守るパスワードを決めます。データはこのパスワードで暗号化して保存され、開くたびにパスワードが要ります。</p>
+ ${legacy?`<div class="okbox">前の版で暗号化しないで保存されていたデータ（品種${legacy.varieties.length}件・入出荷${legacy.entries.length}件）が見つかりました。パスワードを決めると暗号化して保存しなおし、暗号化されていないほうは消します。</div>`:""}
+ <form id="setupf"><label style="display:block">パスワード（8文字以上）<input type="password" id="setup-pw" autocomplete="new-password"></label>
+ <label style="display:block">もう一度<input type="password" id="setup-pw2" autocomplete="new-password"></label>
+ <button class="btn pri" style="width:100%" id="setup-btn">このパスワードで始める</button></form><div class="err" id="setup-err"></div>${FORGET_WARN}`);
+ $("setupf").onsubmit = async ev=>{ ev.preventDefault();
+  const a=$("setup-pw").value, c=$("setup-pw2").value;
+  if(a.length<8) return $("setup-err").textContent="パスワードは8文字以上にしてください";
+  if(a!==c) return $("setup-err").textContent="2つのパスワードが同じではありません";
+  $("setup-btn").disabled=true; $("setup-btn").textContent="準備中…";
+  sess = await newSession(a);
+  db = legacy || emptyDb();
+  await save();
+  if(legacy) localStorage.removeItem(STORE_KEY);
+  startApp();
+ };
+}
+function lock(msg){
+ sess=null; db=emptyDb(); editV=null; editE=null; planIdx=null;
+ // 画面に残ったデータを消す
+ ["v-table","e-table","e-stock","e-msg","p-main","p-sub","p-table","p-free","p-log","p-warn","p-legend","p-total","pw-msg"].forEach(id=>{ const el=$(id); if(el) el.innerHTML=""; });
+ document.querySelectorAll("#app input[type=text],#app input[type=number],#app input[type=password]").forEach(i=>i.value="");
+ $("e-v").innerHTML=""; $("p-date").innerHTML="";
+ lockScreen(msg);
+}
+let lastActive = Date.now();
+["mousemove","mousedown","keydown","touchstart","scroll","wheel"].forEach(ev=>window.addEventListener(ev,()=>{ lastActive=Date.now(); },{passive:true, capture:true}));
+function idleCheck(){ if(sess && Date.now()-lastActive > IDLE_MS) lock("しばらく操作がなかったので、ロックしました。"); }
+setInterval(idleCheck, 15000);
+document.addEventListener("visibilitychange", idleCheck);
+function startApp(){ lastActive=Date.now(); hideLock(); resetVForm(); showTab(db.entries.length ? "plan" : "master"); }
+function askPassword(title, msg){
+ return new Promise(res=>{
+  const m=document.createElement("div"); m.className="modal";
+  m.innerHTML=`<div class="box"><h2>${esc(title)}</h2><p style="font-size:14px">${esc(msg)}</p><form><input type="password" autocomplete="off"><div class="row"><button class="btn pri">OK</button><button type="button" class="btn">やめる</button></div></form></div>`;
+  document.body.appendChild(m); const i=m.querySelector("input"); i.focus();
+  m.querySelector("form").onsubmit=ev=>{ ev.preventDefault(); const v=i.value; m.remove(); res(v); };
+  m.querySelector("button[type=button]").onclick=()=>{ m.remove(); res(null); };
+ });
+}
+function uid(){ return Math.random().toString(36).slice(2,10)+Date.now().toString(36); }
+function vById(id){ return db.varieties.find(v=>v.id===id); }
+function vName(id){ const v=vById(id); return v? v.name : "（削除された品種）"; }
+function vColor(id){ const v=vById(id); return v? v.color : "#ccc"; }
+function nextColor(){
+ const used = new Set(db.varieties.map(v=>v.color.toLowerCase()));
+ for(const c of PAL) if(!used.has(c)) return c;
+ return PAL[db.varieties.length % PAL.length];
+}
+function esc(s){ return String(s??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c])); }
+function toG(kg){ return Math.round(Number(kg)*1000); }
+function fk(g){ return (g/1000).toLocaleString("ja-JP",{maximumFractionDigits:3}); }   // グラム→kg表示
+function fmtPolish(v){ return (v && v.polish!=="" && v.polish!=null) ? v.polish+"%" : "—"; }
+function sortedEntries(){ return db.entries.slice().sort((a,b)=> a.date<b.date?-1:a.date>b.date?1:(a.seq-b.seq)); }
+
+/* ===================== 配置の計算（入出荷を順番に再生・ロット＝入荷1件ごと・先入れ先出し） ===================== */
+function laneCap(L){ return L.spots.length*2; }
+function lotCmp(a,b){ return a.date<b.date?-1:a.date>b.date?1:(a.seq-b.seq); }
+function md(d){ const p=String(d||"").split("-"); return p.length===3 ? `${+p[1]}/${+p[2]}` : String(d||""); }
+function simulate(){
+ const lanes = LANES.map(L=>({...L, v:null, bags:[]}));   // bags: 奥の下段→手前の上段 [{g, lot}]
+ let over = [];               // 倉庫に入らなかった分 [{lot, vid, g}]
+ const lots = {};             // ロット（入荷1件）: id -> {id, date, seq, vid}
+ const entries = sortedEntries();
+ const results = [], snaps = [];
+ const anyBulk = ()=> db.varieties.some(v=>v.bulk);
+ const sumL = L => L.bags.reduce((a,b)=>a+b.g,0);
+ const stockOf = vid => lanes.reduce((s,L)=> s + (L.v===vid ? sumL(L):0),0) + over.filter(o=>o.vid===vid).reduce((a,o)=>a+o.g,0);
+ const allStocks = () => { const t={}; for(const L of lanes) if(L.v) t[L.v]=(t[L.v]||0)+sumL(L); for(const o of over) t[o.vid]=(t[o.vid]||0)+o.g; return t; };
+ const spotOf = (L,i)=> L.spots[Math.floor(i/2)] + (i%2? "上段":"下段");
+ const older = (a,b)=> lotCmp(lots[a], lots[b]) < 0;
+ const olderIn = (L, lot)=> [...new Set(L.bags.filter(b=>b.lot!==lot && older(b.lot, lot)).map(b=>b.lot))];
+
+ function mainPref(vid, after){
+  const v = vById(vid);
+  if(v && v.bulk) return true;
+  if(anyBulk()) return false;
+  const t = allStocks();
+  for(const k in t) if(k!==vid && t[k] > after) return false;
+  return true;
+ }
+ function pickEmpty(vid, g){
+  const empty = lanes.filter(L=>L.v===null);
+  if(!empty.length) return null;
+  const ownAny = lanes.find(L=>L.v===vid);
+  const pref = mainPref(vid, stockOf(vid)+g);
+  const wh = ownAny ? ownAny.wh : (pref ? "main":"sub");
+  let cand = empty.filter(L=>L.wh===wh);
+  if(!cand.length) cand = empty;
+  const need = Math.ceil(g/BAG);
+  if(pref) return cand.slice().sort((a,b)=> laneCap(b)-laneCap(a))[0];   // 大量・一番多い品種は長い列から
+  const fit = cand.filter(L=>laneCap(L)>=need).sort((a,b)=> laneCap(a)-laneCap(b));  // ほかは量に合う短い列
+  return fit.length ? fit[0] : cand.slice().sort((a,b)=> laneCap(b)-laneCap(a))[0];
+ }
+ function pickLane(vid, lot, g){
+  // 1) 同じロットが一番手前にある列のつづき
+  const same = lanes.find(L=>L.v===vid && L.bags.length<laneCap(L) && L.bags[L.bags.length-1].lot===lot);
+  if(same) return {L:same, blocks:[]};
+  // 2) 空いている列（新しいロットは自分だけの列へ）
+  const e = pickEmpty(vid, g);
+  if(e) return {L:e, blocks:[]};
+  // 3) どうしても無理なら同じ品種の列の手前へ（古い米がふさがれるなら警告）
+  const own = lanes.filter(L=>L.v===vid && L.bags.length<laneCap(L));
+  if(!own.length) return null;
+  own.sort((a,b)=> (olderIn(a,lot).length?1:0)-(olderIn(b,lot).length?1:0) || (laneCap(b)-b.bags.length)-(laneCap(a)-a.bags.length));
+  return {L:own[0], blocks: olderIn(own[0], lot)};
+ }
+ function placeLot(lot, vid, g, msgs){
+  while(g>0){
+   const pk = pickLane(vid, lot, g);
+   if(!pk){
+    over.push({lot, vid, g});
+    const used = lanes.reduce((a,x)=>a+x.bags.length,0);
+    const why = used>=78 ? "倉庫が満杯です" : "1列に1品種のルールで、空いている列がありません（7列すべて使用中）。どれかの列を空けると自動で入ります";
+    msgs.push({w:true, t:`置き場所が足りません：${vName(vid)}（${md(lots[lot].date)}入荷）${fk(g)}kg が倉庫に入りません（未配置）。${why}`}); return;
+   }
+   const L = pk.L; L.v = vid;
+   const start = L.bags.length;
+   while(g>0 && L.bags.length<laneCap(L)){ const b=Math.min(BAG,g); L.bags.push({g:b, lot}); g-=b; }
+   const sp = L.spots.slice(Math.floor(start/2), Math.ceil(L.bags.length/2));
+   msgs.push(`${L.bags.length-start}袋を${WHNAME[L.wh]}の${L.id}列（${rangeTxt(L, sp)}）に置いた`);
+   if(pk.blocks.length) msgs.push({w:true, t:`古い米が奥になり先に出せません：空いている列がないので、${L.id}列の${pk.blocks.map(x=>md(lots[x].date)).join("・")}入荷の${vName(vid)}の手前に置きました`});
+  }
+ }
+ function takeOut(vid, g, msgs){
+  const have = stockOf(vid);
+  if(g>have){ msgs.push({w:true, t:`在庫が足りません：${vName(vid)} の在庫は ${fk(have)}kg なのに ${fk(g)}kg 出荷（${fk(g-have)}kg 足りない分は無視しました）`}); g=have; }
+  const used = {}; let warned=false;
+  while(g>0){
+   const present = new Set(); lanes.forEach(L=>{ if(L.v===vid) L.bags.forEach(b=>present.add(b.lot)); }); over.forEach(o=>{ if(o.vid===vid) present.add(o.lot); });
+   if(!present.size) break;
+   const oldest = [...present].sort((a,b)=>lotCmp(lots[a],lots[b]))[0];
+   // 取り出せる袋：各列の一番手前の上段と、倉庫の外（未配置）
+   const cands = [];
+   lanes.forEach(L=>{ if(L.v===vid && L.bags.length){ const b=L.bags[L.bags.length-1]; cands.push({L, b, lot:b.lot, part:b.g<BAG, n:L.bags.length}); } });
+   over.forEach(o=>{ if(o.vid===vid) cands.push({o, lot:o.lot, part:true, n:0}); });
+   cands.sort((a,b)=> lotCmp(lots[a.lot],lots[b.lot]) || (b.part-a.part) || (a.n-b.n));
+   const c = cands[0];
+   if(c.lot!==oldest && !warned){ warned=true; msgs.push({w:true, t:`いちばん古い${md(lots[oldest].date)}入荷の${vName(vid)}が奥にあって出せません。手前の${md(lots[c.lot].date)}入荷から出しました`}); }
+   let t; const key=(c.o?"over":c.L.id)+"|"+c.lot; const u=(used[key] ||= {L:c.L, lot:c.lot, sp:[], g:0});
+   if(c.o){ t=Math.min(c.o.g,g); c.o.g-=t; if(!c.o.g) over=over.filter(x=>x!==c.o); }
+   else { const i=c.L.bags.length-1; const sp=c.L.spots[Math.floor(i/2)]; if(!u.sp.includes(sp)) u.sp.push(sp); t=Math.min(c.b.g,g); c.b.g-=t; if(!c.b.g){ c.L.bags.pop(); if(!c.L.bags.length) c.L.v=null; } }
+   g-=t; u.g+=t;
+  }
+  const parts = Object.values(used).map(u=>`${u.L?rangeTxt(u.L,u.sp):"未配置分"}（${md(lots[u.lot].date)}入荷）から${fk(u.g)}kg`);
+  if(parts.length) msgs.push(parts.join("、"));
+ }
+ function retryOver(msgs){
+  if(!over.length) return;
+  const items = over.slice().sort((a,b)=>lotCmp(lots[a.lot],lots[b.lot])); over=[];
+  for(const o of items){
+   const m=[]; placeLot(o.lot, o.vid, o.g, m);
+   const left = over.filter(x=>x.lot===o.lot).reduce((a,x)=>a+x.g,0);
+   if(o.g-left>0) msgs.push(`未配置だった${vName(o.vid)}（${md(lots[o.lot].date)}入荷）のうち${fk(o.g-left)}kgを倉庫に入れた`);
+   m.filter(x=>x && x.w && x.t.startsWith("古い米")).forEach(x=>msgs.push(x));
+  }
+ }
+ function snapshot(){
+  const spots = {};
+  for(const L of lanes) L.bags.forEach((b,i)=>{ const s=L.spots[Math.floor(i/2)]; (spots[s] ||= {v:L.v, bags:[]}).bags.push({g:b.g, lot:b.lot}); });
+  return {spots, lanes: lanes.map(L=>({id:L.id, wh:L.wh, spots:L.spots, v:L.v, bags:L.bags.map(b=>({...b}))})), over: over.map(o=>({...o})), lots};
+ }
+ let curDate = null, dayLog = [];
+ for(const e of entries){
+  if(curDate!==null && e.date!==curDate){ snaps.push({date:curDate, ...snapshot(), log:dayLog}); dayLog=[]; }
+  curDate = e.date;
+  const msgs = [];
+  if(!vById(e.vid)) msgs.push({w:true, t:"品種がマスターにありません（計算から外しました）"});
+  else if(e.type==="in"){ lots[e.id]={id:e.id, date:e.date, seq:e.seq, vid:e.vid}; placeLot(e.id, e.vid, toG(e.kg), msgs); }
+  else takeOut(e.vid, toG(e.kg), msgs);
+  if(vById(e.vid)) retryOver(msgs);
+  const stock = vById(e.vid) ? stockOf(e.vid) : 0;
+  const r = {e, msgs, stock, warn: msgs.some(m=>m && m.w)};
+  results.push(r); dayLog.push(r);
+ }
+ if(curDate!==null) snaps.push({date:curDate, ...snapshot(), log:dayLog});
+ return {results, snaps, lots};
+}
+function rangeTxt(L, sp){
+ const nums = sp.map(s=>+s.slice(1)).sort((a,b)=>a-b);
+ if(!nums.length) return "";
+ return nums.length===1 ? L.id+nums[0] : `${L.id}${nums[0]}〜${L.id}${nums[nums.length-1]}`;
+}
+function overByV(snap){ const t={}; for(const o of snap.over) t[o.vid]=(t[o.vid]||0)+o.g; return t; }
+function stockTotals(snap){ const t={}; for(const L of snap.lanes) if(L.v) t[L.v]=(t[L.v]||0)+L.bags.reduce((a,b)=>a+b.g,0); for(const o of snap.over) t[o.vid]=(t[o.vid]||0)+o.g; return t; }
+// 置き方のチェック: errs=ルール違反, blocked=古い米が新しい米の奥にある列
+function verify(snap){
+ const errs=[], blocked=[], partials={};
+ for(const L of snap.lanes){
+  if(L.bags.length>L.spots.length*2) errs.push(`${L.id}列の段数オーバー`);
+  const vs = new Set(L.bags.map(()=>L.v)); if(vs.size>1) errs.push(`${L.id}列に2品種`);
+  L.bags.forEach((b,i)=>{
+   if(b.g>BAG) errs.push(`${L.id}列に500kgを超える袋があります`);
+   if(b.g<BAG){ partials[b.lot]=(partials[b.lot]||0)+1; const nx=L.bags[i+1]; if(nx && nx.lot===b.lot) errs.push(`${L.id}列で端数の袋がそのロットの一番手前にありません`); }
+  });
+  const seen=[]; // 奥から見て、手前に自分より新しいロットがあれば「ふさがれている」
+  for(let i=0;i<L.bags.length;i++){ const lot=L.bags[i].lot; if(!seen.includes(lot)) seen.push(lot); }
+  for(let i=0;i<seen.length;i++) for(let j=i+1;j<seen.length;j++) if(lotCmp(snap.lots[seen[i]], snap.lots[seen[j]])<0) blocked.push({lane:L.id, v:L.v, older:seen[i], newer:seen[j]});
+ }
+ for(const k in partials) if(partials[k]>1) errs.push(`${vName(snap.lots[k]?.vid)}（${md(snap.lots[k]?.date)}入荷）の端数の袋が${partials[k]}個あります`);
+ return {errs, blocked};
+}
+
+/* ===================== 図（SVG） ===================== */
+/* 色: 同じ品種は同じ色相。古いロットほど濃く、新しいほど薄く */
+function hex2hsl(h){ h=h.replace("#",""); if(h.length===3) h=[...h].map(c=>c+c).join(""); const r=parseInt(h.slice(0,2),16)/255,g=parseInt(h.slice(2,4),16)/255,b=parseInt(h.slice(4,6),16)/255;
+ const mx=Math.max(r,g,b), mn=Math.min(r,g,b); let H=0,S=0; const L=(mx+mn)/2;
+ if(mx!==mn){ const d=mx-mn; S=L>.5? d/(2-mx-mn) : d/(mx+mn); H = mx===r ? (g-b)/d+(g<b?6:0) : mx===g ? (b-r)/d+2 : (r-g)/d+4; H*=60; }
+ return [H, S*100, L*100]; }
+function hsl(h,s,l){ return `hsl(${h.toFixed(0)},${s.toFixed(0)}%,${l.toFixed(0)}%)`; }
+let SHADE = {}, SHADE_L = {}, LOTS = {};
+function computeShades(snap){
+ SHADE={}; SHADE_L={}; LOTS=snap.lots||{};
+ const byV={};
+ const add=(lot,vid)=>{ (byV[vid] ||= new Set()).add(lot); };
+ snap.lanes.forEach(L=>L.bags.forEach(b=>add(b.lot,L.v))); (snap.over||[]).forEach(o=>add(o.lot,o.vid));
+ for(const vid in byV){
+  const arr=[...byV[vid]].sort((a,b)=>lotCmp(LOTS[a],LOTS[b])); const [h,s,l]=hex2hsl(vColor(vid)); const n=arr.length;
+  const dark=Math.max(32,l-26), light=Math.min(88,l+14);
+  arr.forEach((lot,i)=>{ const L = n===1 ? l : dark + (light-dark)*i/(n-1); SHADE[lot]=hsl(h, Math.min(90,s+(n>1&&i===0?8:0)), L); SHADE_L[lot]=L; });
+ }
+}
+function lotColor(lot){ return SHADE[lot] || "#ccc"; }
+const FONT = `"Noto Sans CJK JP","Noto Sans JP","Hiragino Sans","Yu Gothic",Meiryo,sans-serif`;
+function textW(t){ let w=0; for(const ch of String(t)) w += /[\x20-\x7e]/.test(ch) ? 0.58 : 1.0; return w; }
+function fitFs(t, maxW, fs){ const w=textW(t)*fs; return w>maxW ? Math.max(6, fs*maxW/w) : fs; }
+function T(x,y,t,fs,opt=""){ return `<text x="${x}" y="${y}" font-size="${fs.toFixed(1)}" text-anchor="middle" ${opt}>${esc(t)}</text>`; }
+function circle(s, sp, changed, x, y, r, lab, big){
+ const fs = big ? [28,22,22,17,17] : [18,13,13,10.5,10.5];
+ const d = sp[lab];
+ if(d){
+  const b=d.bags, tot=b.reduce((a,c)=>a+c.g,0), full=b.length===2 && tot===2*BAG;
+  const top=b[b.length-1], bot=b[0];
+  const dash = full ? "" : ` stroke-dasharray="${big?"14 8":"8 5"}"`;
+  if(b.length===2 && top.lot!==bot.lot){   // 上段と下段でロットがちがう: 上半分=上段、下半分=下段
+   s.push(`<path d="M ${x-r} ${y} A ${r} ${r} 0 0 1 ${x+r} ${y} Z" fill="${lotColor(top.lot)}"/><path d="M ${x-r} ${y} A ${r} ${r} 0 0 0 ${x+r} ${y} Z" fill="${lotColor(bot.lot)}"/>`);
+   s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="none" stroke="#222" stroke-width="3"${dash}/>`);
+  } else s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="${lotColor(top.lot)}" stroke="#222" stroke-width="3"${dash}/>`);
+  const darkFill = Math.min(...b.map(z=>SHADE_L[z.lot]??70)) < 50;
+  const tc = darkFill ? 'fill="#fff"' : 'fill="#111"';
+  const nm = vName(d.v), kgt = fk(tot)+"kg";
+  let sub = `${b.length}段`;
+  if(!full){ if(b.length===2) sub += ` 上段${fk(top.g)}kg`; else if(bot.g<BAG) sub += ` ${fk(bot.g)}kg`; }
+  const dates = (b.length===2 && top.lot!==bot.lot) ? `下${md(LOTS[bot.lot]?.date)}・上${md(LOTS[top.lot]?.date)}入荷` : `${md(LOTS[top.lot]?.date)}入荷`;
+  s.push(T(x, y-r*0.47, lab, fs[0], `font-weight="bold" ${tc}`));
+  s.push(T(x, y-r*0.13, nm, fitFs(nm, r*1.75, fs[1]), `font-weight="bold" ${tc}`));
+  s.push(T(x, y+r*0.18, kgt, fitFs(kgt, r*1.7, fs[2]), `font-weight="bold" ${tc}`));
+  s.push(T(x, y+r*0.45, sub, fitFs(sub, r*1.45, fs[3]), tc));
+  s.push(T(x, y+r*0.71, dates, fitFs(dates, r*1.25, fs[4]), tc));
+ }else{
+  s.push(`<circle cx="${x}" cy="${y}" r="${r}" fill="#e8e8e8" stroke="#333" stroke-width="3"/>`);
+  s.push(T(x, y, lab, fs[0], 'font-weight="bold" fill="#999"'));
+  s.push(T(x, y+fs[1]*1.3, "空き", fs[1], 'fill="#999"'));
+ }
+ if(changed.has(lab)) s.push(`<circle cx="${x}" cy="${y}" r="${r+6}" fill="none" stroke="#d62d20" stroke-width="${big?6:4}" stroke-opacity=".85"/>`);
+}
+function whTotals(sp, keys){ const t={}; let n=0; for(const k of keys) if(sp[k]){ t[sp[k].v]=(t[sp[k].v]||0)+sp[k].bags.reduce((a,b)=>a+b.g,0); n+=sp[k].bags.length; } return {t,n}; }
+function summaryTxt(t){ const ks=orderVids(Object.keys(t)); return ks.map(v=>`${vName(v)} ${fk(t[v])}kg`).join(" ／ ") || "空"; }
+function orderVids(ids){ const idx=id=>{const i=db.varieties.findIndex(v=>v.id===id); return i<0?999:i;}; return ids.slice().sort((a,b)=>idx(a)-idx(b)); }
+const MAIN_KEYS = LANES.filter(L=>L.wh==="main").flatMap(L=>L.spots);
+const SUB_KEYS = LANES.filter(L=>L.wh==="sub").flatMap(L=>L.spots);
+function mainSvg(sp, changed){
+ const r=96, colw=200, xs=[200,400,600], top=150, step=196, H=8*step+160, W=800, Ht=top+H+140;
+ const {t,n} = whTotals(sp, MAIN_KEYS);
+ const sum = summaryTxt(t);
+ const s=[`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Ht}" font-family='${FONT}'>`, `<rect width="${W}" height="${Ht}" fill="#fff"/>`,
+  T(400,50,"メイン倉庫",32,'font-weight="bold"'),
+  T(400,92,sum,fitFs(sum,760,22)),
+  T(400,128,`${n}袋 ／ 最大42袋（21,000kg） ／ あと${42-n}袋分`,22),
+  `<rect x="100" y="${top}" width="600" height="${H}" fill="#f7f7f2" stroke="#333" stroke-width="5"/>`,
+  `<rect x="100" y="${top}" width="${colw}" height="${step*1.5}" fill="#e6e0f5" stroke="#333" stroke-width="3"/>`,
+  `<line x1="92" y1="${top+H}" x2="88" y2="${top+H+120}" stroke="#333" stroke-width="3"/>`,
+  `<line x1="700" y1="${top+H}" x2="706" y2="${top+H+120}" stroke="#333" stroke-width="3"/>`,
+  `<rect x="330" y="${top+H-6}" width="200" height="12" fill="#fff"/>`,
+  T(430,top+H+45,"▼ 扉（サブ倉庫へ）",22,'font-weight="bold" fill="#c0392b"'),
+  `<rect x="94" y="${top+H-180}" width="12" height="160" fill="#c0392b"/>`,
+  `<text x="20" y="${top+H-110}" font-size="20" fill="#c0392b" font-weight="bold">電動</text><text x="20" y="${top+H-85}" font-size="20" fill="#c0392b" font-weight="bold">ｼｬｯﾀｰ</text><text x="20" y="${top+H-60}" font-size="20" fill="#c0392b">（外）</text>`];
+ for(let i=0;i<5;i++) circle(s, sp, changed, xs[0], top+step*1.5+r+10+i*step, r, `A${i+1}`, true);
+ [["B",xs[1]],["C",xs[2]]].forEach(([c,x])=>{ for(let i=0;i<8;i++) circle(s, sp, changed, x, top+r+4+i*step, r, `${c}${i+1}`, true); });
+ s.push("</svg>"); return s.join("");
+}
+function subSvg(sp, changed){
+ const r=55, W=1000, Ht=820;
+ const {t,n} = whTotals(sp, SUB_KEYS);
+ const sum = summaryTxt(t), l2 = `${n}袋 ／ 最大36袋（18,000kg） ／ あと${36-n}袋分`;
+ const s=[`<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 ${W} ${Ht}" font-family='${FONT}'>`, `<rect width="${W}" height="${Ht}" fill="#fff"/>`,
+  T(500,45,"サブ倉庫",32,'font-weight="bold"'),
+  T(500,85,sum,fitFs(sum,960,22)),
+  T(500,118,l2,20),
+  '<g transform="translate(0,130)">', '<rect x="60" y="80" width="940" height="600" fill="#f7f7f2"/>',
+  '<polyline points="1000,80 60,80 60,680 1000,680" fill="none" stroke="#333" stroke-width="5"/>',
+  '<line x1="695" y1="80" x2="695" y2="10" stroke="#333" stroke-width="4"/>', '<rect x="760" y="74" width="200" height="12" fill="#fff"/>',
+  T(860,45,"▲ メイン倉庫へ",22,'font-weight="bold" fill="#c0392b"'),
+  T(850,240,"通路",22,'fill="#666"')];
+ const xs=[172,290,408,526,644];
+ xs.forEach((x,i)=>circle(s, sp, changed, x,150,r,`D${i+1}`,false));
+ xs.forEach((x,i)=>circle(s, sp, changed, x,320,r,`E${i+1}`,false));
+ xs.slice(0,4).forEach((x,i)=>circle(s, sp, changed, x,495,r,`F${i+1}`,false));
+ let k=1; for(const y of [495,610]) for(const x of [773,890]) circle(s, sp, changed, x,y,r,`G${k++}`,false);
+ s.push("</g></svg>"); return s.join("");
+}
+
+/* ===================== 画面 ===================== */
+let curTab = "master", editV=null, editE=null, planIdx=null;
+function $(id){ return document.getElementById(id); }
+function showTab(t){
+ curTab=t;
+ document.querySelectorAll(".tab").forEach(d=>d.style.display = d.id==="tab-"+t ? "" : "none");
+ document.querySelectorAll(".tabs button").forEach(b=>b.classList.toggle("on", b.dataset.tab===t));
+ render();
+}
+document.querySelectorAll(".tabs button").forEach(b=>b.onclick=()=>showTab(b.dataset.tab));
+
+function render(){
+ renderSampleBar();
+ if(curTab==="master") renderMaster();
+ if(curTab==="entry") renderEntry();
+ if(curTab==="plan") renderPlan();
+}
+function hasSample(){ return db.varieties.some(v=>v.sample) || db.entries.some(e=>e.sample); }
+function renderSampleBar(){
+ $("samplebar").innerHTML = hasSample() ? `<div class="samplebar">⚠ いま入っているのは<b>サンプルデータ（例）</b>です。本番の在庫ではありません。<button class="btn sm" onclick="clearSample()">サンプルを消す</button></div>` : "";
+}
+
+/* ---- マスター ---- */
+function renderMaster(){
+ if(!editV && !$("v-color").dataset.touched) $("v-color").value = nextColor();
+ const rows = db.varieties.map(v=>{
+  const n = db.entries.filter(e=>e.vid===v.id).length;
+  return `<tr${editV===v.id?' class="editing"':''}><td><span class="sw" style="background:${v.color}"></span>${esc(v.name)}${v.sample?' <span class="muted">（サンプル）</span>':''}</td><td class="num">${esc(fmtPolish(v))}</td><td>${v.bulk?"✔ 大量入荷予定":""}</td><td>${esc(v.memo)}</td><td class="num">${n}件</td>
+  <td style="white-space:nowrap"><button class="btn sm" onclick="editVariety('${v.id}')">編集</button> <button class="btn sm warn" onclick="delVariety('${v.id}')">削除</button></td></tr>`;
+ }).join("");
+ $("v-table").innerHTML = `<tr><th>品種名</th><th class="num">精米歩合</th><th>メイン優先</th><th>メモ</th><th class="num">入出荷</th><th></th></tr>` + (rows || `<tr><td colspan="6" class="muted">まだ品種がありません。上で登録してください。</td></tr>`);
+}
+$("v-color").oninput = ()=>{ $("v-color").dataset.touched="1"; };
+$("v-save").onclick = ()=>{
+ const name = $("v-name").value.trim();
+ if(!name){ alert("品種名を入れてください"); return; }
+ if(/^[A-G][0-9]*$/.test(name)){ if(!confirm(`「${name}」は置き場所の記号（A〜G）とまぎらわしいです。このまま登録しますか？`)) return; }
+ if(db.varieties.some(v=>v.name===name && v.id!==editV)){ alert("同じ名前の品種がもうあります"); return; }
+ const polish = $("v-polish").value==="" ? "" : Number($("v-polish").value);
+ if(polish!=="" && (isNaN(polish) || polish<0 || polish>100)){ alert("精米歩合は0〜100の数字で入れてください"); return; }
+ const data = {name, polish, color:$("v-color").value, memo:$("v-memo").value.trim(), bulk:$("v-bulk").checked};
+ if(editV){ Object.assign(vById(editV), data); } else db.varieties.push({id:uid(), ...data});
+ save(); resetVForm(); render();
+};
+$("v-cancel").onclick = ()=>{ resetVForm(); render(); };
+function resetVForm(){ editV=null; ["v-name","v-polish","v-memo"].forEach(i=>$(i).value=""); $("v-bulk").checked=false; delete $("v-color").dataset.touched; $("v-color").value=nextColor(); $("v-save").textContent="登録"; $("vform-title").textContent="品種を登録"; $("v-cancel").style.display="none"; }
+function editVariety(id){
+ const v=vById(id); editV=id;
+ $("v-name").value=v.name; $("v-polish").value=v.polish; $("v-color").value=v.color; $("v-memo").value=v.memo||""; $("v-bulk").checked=!!v.bulk;
+ $("v-save").textContent="変更を保存"; $("vform-title").textContent=`「${v.name}」を編集`; $("v-cancel").style.display=""; render(); window.scrollTo(0,0);
+}
+function delVariety(id){
+ const v=vById(id); const n=db.entries.filter(e=>e.vid===id).length;
+ if(!confirm(n ? `「${v.name}」を削除すると、この品種の入出荷データ${n}件も消えます。削除しますか？` : `「${v.name}」を削除しますか？`)) return;
+ db.varieties = db.varieties.filter(x=>x.id!==id); db.entries = db.entries.filter(e=>e.vid!==id);
+ if(editV===id) resetVForm(); save(); render();
+}
+
+/* ---- 入出荷 ---- */
+function todayStr(){ const d=new Date(); return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,"0")}-${String(d.getDate()).padStart(2,"0")}`; }
+function renderEntry(){
+ const sel=$("e-v"), cur=sel.value;
+ sel.innerHTML = db.varieties.length ? db.varieties.map(v=>`<option value="${v.id}">${esc(v.name)}（${esc(fmtPolish(v))}）</option>`).join("") : `<option value="">先にマスターで品種を登録</option>`;
+ if(cur && vById(cur)) sel.value=cur;
+ if(!$("e-date").value) $("e-date").value=todayStr();
+ const {results, snaps} = simulate();
+ // 現在の在庫
+ const last = snaps[snaps.length-1];
+ const tot = last ? stockTotals(last) : {}, ov = last ? overByV(last) : {};
+ const nLots = {}; if(last){ const seen=new Set(); last.lanes.forEach(L=>L.bags.forEach(b=>{ if(!seen.has(b.lot)){ seen.add(b.lot); nLots[L.v]=(nLots[L.v]||0)+1; } })); last.over.forEach(o=>{ if(!seen.has(o.lot)){ seen.add(o.lot); nLots[o.vid]=(nLots[o.vid]||0)+1; } }); }
+ $("e-stock").innerHTML = db.varieties.map(v=>`<div><span class="sw" style="background:${v.color}"></span><b>${esc(v.name)}</b>（${esc(fmtPolish(v))}）<br>${fk(tot[v.id]||0)} kg${nLots[v.id]?`（${nLots[v.id]}ロット）`:""}${ov[v.id]?` <span style="color:#a32f22">（うち未配置 ${fk(ov[v.id])}kg）</span>`:""}</div>`).join("") + `<div><b>合計</b><br>${fk(Object.values(tot).reduce((a,b)=>a+b,0))} kg</div>`;
+ const rows = results.slice().reverse().map(r=>{
+  const e=r.e, v=vById(e.vid);
+  const msgs = r.msgs.filter(m=>m && m.w).map(m=>`<div style="color:#a32f22">⚠ ${esc(m.t)}</div>`).join("");
+  return `<tr class="${editE===e.id?'editing':''}${r.warn?' wrow':''}"><td style="white-space:nowrap">${e.date}</td><td><span class="sw" style="background:${vColor(e.vid)}"></span>${esc(vName(e.vid))}</td><td class="${e.type}">${e.type==="in"?"入荷":"出荷"}</td><td class="num">${e.type==="in"?"+":"−"}${fk(toG(e.kg))}</td><td class="num">${fk(r.stock)}</td><td>${esc(e.memo)}${e.sample?' <span class="muted">（サンプル）</span>':''}${msgs}</td>
+  <td style="white-space:nowrap"><button class="btn sm" onclick="editEntry('${e.id}')">編集</button> <button class="btn sm warn" onclick="delEntry('${e.id}')">削除</button></td></tr>`;
+ }).join("");
+ $("e-table").innerHTML = `<tr><th>日付</th><th>品種</th><th>区分</th><th class="num">数量(kg)</th><th class="num">品種の在庫(kg)</th><th>メモ</th><th></th></tr>` + (rows || `<tr><td colspan="7" class="muted">まだ入出荷がありません。</td></tr>`);
+ $("e-table").insertAdjacentHTML("beforebegin","");
+ const tbl=$("e-table"); tbl.dataset.note="新しい日付が上";
+}
+$("e-save").onclick = ()=>{
+ const date=$("e-date").value, vid=$("e-v").value, type=$("e-type").value, kg=Number($("e-kg").value), memo=$("e-memo").value.trim();
+ if(!vid || !vById(vid)){ alert("品種を選んでください（先にマスターで登録）"); return; }
+ if(!date){ alert("日付を入れてください"); return; }
+ if(!(kg>0)){ alert("数量（kg）を0より大きい数字で入れてください"); return; }
+ if(editE){ Object.assign(db.entries.find(e=>e.id===editE), {date, vid, type, kg, memo}); }
+ else db.entries.push({id:uid(), seq:db.seq++, date, vid, type, kg, memo});
+ save();
+ const r = simulate().results.find(x=>x.e.id===(editE||db.entries[db.entries.length-1].id));
+ $("e-msg").innerHTML = r ? (r.warn ? `<div class="warnbox">${r.msgs.map(m=>esc(typeof m==="string"?m:"⚠ "+m.t)).join("<br>")}</div>` : `<div class="okbox">${esc(date)} ${esc(vName(vid))} ${type==="in"?"入荷":"出荷"} ${fk(toG(kg))}kg：${r.msgs.map(m=>esc(typeof m==="string"?m:m.t)).join("、")}</div>`) : "";
+ editE=null; $("e-kg").value=""; $("e-memo").value=""; $("e-save").textContent="追加"; $("eform-title").textContent="入出荷を入力"; $("e-cancel").style.display="none";
+ planIdx=null; render();
+};
+$("e-cancel").onclick=()=>{ editE=null; $("e-kg").value=""; $("e-memo").value=""; $("e-save").textContent="追加"; $("eform-title").textContent="入出荷を入力"; $("e-cancel").style.display="none"; render(); };
+function editEntry(id){
+ const e=db.entries.find(x=>x.id===id); editE=id;
+ $("e-date").value=e.date; $("e-v").value=e.vid; $("e-type").value=e.type; $("e-kg").value=e.kg; $("e-memo").value=e.memo||"";
+ $("e-save").textContent="変更を保存"; $("eform-title").textContent="入出荷を編集"; $("e-cancel").style.display=""; $("e-msg").innerHTML=""; render(); window.scrollTo(0,0);
+}
+function delEntry(id){
+ const e=db.entries.find(x=>x.id===id);
+ if(!confirm(`${e.date} ${vName(e.vid)} ${e.type==="in"?"入荷":"出荷"} ${fk(toG(e.kg))}kg を削除しますか？`)) return;
+ db.entries=db.entries.filter(x=>x.id!==id); if(editE===id) editE=null; save(); planIdx=null; render();
+}
+
+/* ---- 配置図 ---- */
+function renderPlan(){
+ const {snaps} = simulate();
+ const sel=$("p-date"), rng=$("p-range");
+ if(!snaps.length){
+  sel.innerHTML="<option>データなし</option>"; rng.max=0; $("p-title").textContent="入出荷データがありません";
+  const empty={spots:{},lanes:LANES.map(L=>({id:L.id,wh:L.wh,spots:L.spots,v:null,bags:[]})),over:[],lots:{},log:[]};
+  drawPlan(empty, null); return;
+ }
+ if(planIdx===null || planIdx>=snaps.length) planIdx=snaps.length-1;
+ sel.innerHTML = snaps.map((s,i)=>`<option value="${i}">${s.date}${dow(s.date)}</option>`).join("");
+ sel.value=planIdx; rng.max=snaps.length-1; rng.value=planIdx;
+ $("p-prev").disabled = planIdx<=0; $("p-next").disabled = planIdx>=snaps.length-1;
+ const s=snaps[planIdx];
+ $("p-title").textContent = s.date+dow(s.date)+`（${planIdx+1}／${snaps.length}日目）`;
+ drawPlan(s, planIdx>0 ? snaps[planIdx-1] : null);
+}
+function dow(d){ const w="日月火水木金土"[new Date(d+"T00:00:00").getDay()]; return w?`（${w}）`:""; }
+function drawPlan(s, prev){
+ computeShades(s);
+ // この日に変わった場所
+ const changed=new Set();
+ const keyOf = sp => sp ? sp.v+":"+sp.bags.map(b=>b.lot+"="+b.g).join(",") : "";
+ for(const k of [...MAIN_KEYS, ...SUB_KEYS]){ if(keyOf(s.spots[k]) !== keyOf(prev ? prev.spots[k] : null)) changed.add(k); }
+ $("p-main").innerHTML = mainSvg(s.spots, changed);
+ $("p-sub").innerHTML = subSvg(s.spots, changed);
+ // 品種ごと・ロットごと
+ const per={};   // vid -> {g,n,lanes:Set, lots:{lot:{g,n,where:{laneId:[spots]}, partial, reach}}}
+ const P = vid => (per[vid] ||= {g:0,n:0,lanes:[],lots:{}});
+ const PL = (vid,lot) => (P(vid).lots[lot] ||= {g:0,n:0,where:{},partial:null,reach:false,over:0});
+ for(const L of s.lanes){ if(!L.v) continue;
+  const p=P(L.v); p.n+=L.bags.length; p.g+=L.bags.reduce((a,b)=>a+b.g,0);
+  p.lanes.push(`${WHNAME[L.wh].replace("倉庫","")} ${rangeTxt(L, L.spots.slice(0,Math.ceil(L.bags.length/2)))}`);
+  L.bags.forEach((b,i)=>{ const q=PL(L.v,b.lot); q.g+=b.g; q.n++; const sp=L.spots[Math.floor(i/2)]; const w=(q.where[L.id] ||= {L, sp:[]}); if(!w.sp.includes(sp)) w.sp.push(sp);
+   if(b.g<BAG) q.partial=`${sp}${i%2?"上段":"下段"} ${fk(b.g)}kg`; if(i===L.bags.length-1) q.reach=true; });
+ }
+ for(const o of s.over){ const q=PL(o.vid,o.lot); q.g+=o.g; q.over+=o.g; q.reach=true; P(o.vid).g+=o.g; }
+ const vids = orderVids(Object.keys(per));
+ let tg=0, tn=0, to=0;
+ const rows = vids.map(id=>{ const p=per[id], v=vById(id);
+  const lotIds = Object.keys(p.lots).sort((a,b)=>lotCmp(s.lots[a],s.lots[b]));
+  const oV = lotIds.reduce((a,l)=>a+p.lots[l].over,0); tg+=p.g; tn+=p.n; to+=oV;
+  const head = `<tr style="background:#f7f7f2"><td><span class="sw" style="background:${vColor(id)}"></span><b>${esc(vName(id))}</b></td><td class="num">${esc(fmtPolish(v))}</td><td>計 ${lotIds.length}ロット</td><td class="num"><b>${fk(p.g)}</b></td><td class="num"><b>${p.n}</b></td><td class="muted">（下のロットごと）</td><td></td><td></td></tr>`;
+  const sub = lotIds.map((l,i)=>{ const q=p.lots[l];
+   const where = Object.values(q.where).map(w=>`${WHNAME[w.L.wh].replace("倉庫","")} ${rangeTxt(w.L,w.sp)}`).join("、") + (q.over?`${Object.keys(q.where).length?"、":""}<span style="color:#a32f22">未配置 ${fk(q.over)}kg</span>`:"");
+   const st = q.reach ? (i===0 ? "✔ 次に出す" : "出せる") : `<span style="color:#a32f22">⚠ 奥（手前に新しい米）</span>`;
+   return `<tr><td></td><td></td><td style="white-space:nowrap"><span class="sw" style="background:${lotColor(l)}"></span>${md(s.lots[l].date)}入荷${i===0?' <span class="muted">（いちばん古い）</span>':''}</td><td class="num">${fk(q.g)}</td><td class="num">${q.n}</td><td>${where||"—"}</td><td>${q.partial?esc(q.partial):"なし"}</td><td>${st}</td></tr>`; }).join("");
+  return head+sub; }).join("");
+ $("p-table").innerHTML = `<tr><th>品種</th><th class="num">精米歩合</th><th>入荷日（ロット）</th><th class="num">在庫kg</th><th class="num">袋数</th><th>置き場所</th><th>端数の袋</th><th>取り出し</th></tr>` + (rows||`<tr><td colspan="8" class="muted">在庫なし</td></tr>`) + `<tr><th>合計</th><th></th><th></th><th class="num">${fk(tg)}</th><th class="num">${tn}</th><th colspan="3"></th></tr>`;
+ const nm = s.lanes.filter(L=>L.wh==="main").reduce((a,L)=>a+L.bags.length,0), ns = s.lanes.filter(L=>L.wh==="sub").reduce((a,L)=>a+L.bags.length,0);
+ const freeLanes = s.lanes.filter(L=>!L.v).map(L=>L.id);
+ $("p-free").innerHTML = `空き：メイン倉庫 あと${CAP.main-nm}袋分（${fk((CAP.main-nm)*BAG)}kg）、サブ倉庫 あと${CAP.sub-ns}袋分（${fk((CAP.sub-ns)*BAG)}kg）、合計 あと${78-nm-ns}袋分。<br>空いている列：${freeLanes.length?freeLanes.join("・")+"列（新しい入荷はまず空いている列に置きます）":"なし（次の入荷は、同じ品種の列の手前に置くことになり、古い米がふさがれます）"}`;
+ $("p-total").textContent = summaryTxt(Object.fromEntries(vids.map(id=>[id,per[id].g]))) + ` ／ 合計 ${fk(tg)}kg`;
+ // 凡例（精米歩合・ロットの濃さつき）
+ $("p-legend").innerHTML = vids.map(id=>{ const ls=Object.keys(per[id].lots).sort((a,b)=>lotCmp(s.lots[a],s.lots[b]));
+   return `<span><b>${esc(vName(id))}</b>（精米歩合 ${esc(fmtPolish(vById(id)))}）：${ls.map(l=>`<span class="sw" style="background:${lotColor(l)}"></span>${md(s.lots[l].date)}`).join(" ")}</span>`; }).join("")
+  + `<span><span class="sw" style="background:#e8e8e8"></span>空き</span>`;
+ // 警告
+ const warns=[];
+ for(const r of s.log) for(const m of r.msgs) if(m && m.w) warns.push(`${r.e.date} ${vName(r.e.vid)}：${m.t}`);
+ if(to>0) warns.push(`倉庫に入りきらない分があります（合計 ${fk(to)}kg）。置き場所を空けるか、別の場所を考えてください。`);
+ const {errs, blocked}=verify(s);
+ errs.forEach(e=>warns.push("置き方のルール違反："+e));
+ blocked.forEach(b=>warns.push(`古い米が奥になり先に出せません：${b.lane}列の${vName(b.v)} ${md(s.lots[b.older].date)}入荷の手前に${md(s.lots[b.newer].date)}入荷があります`));
+ $("p-warn").innerHTML = warns.length ? `<div class="warnbox">${[...new Set(warns)].map(w=>"⚠ "+esc(w)).join("<br>")}</div>` : (s.log.length?`<div class="okbox">✔ 先入れ先出しOK：どの品種もいちばん古い入荷の米を手前から出せます（1列に1品種・1袋に1ロット・新しい米は古い米の手前に置いていません）。</div>`:"");
+ $("p-log").innerHTML = s.log.map(r=>`<li class="${r.warn?'w':''}"><span class="${r.e.type}">${r.e.type==="in"?"入荷":"出荷"}</span> ${esc(vName(r.e.vid))} ${fk(toG(r.e.kg))}kg${r.e.memo?`（${esc(r.e.memo)}）`:""} → ${r.msgs.map(m=>esc(typeof m==="string"?m:"⚠ "+m.t)).join("、")||"—"}（在庫 ${fk(r.stock)}kg）</li>`).join("") || `<li class="muted">なし</li>`;
+}
+$("p-date").onchange=()=>{ planIdx=+$("p-date").value; renderPlan(); };
+$("p-range").oninput=()=>{ planIdx=+$("p-range").value; renderPlan(); };
+$("p-prev").onclick=()=>{ if(planIdx>0){ planIdx--; renderPlan(); } };
+$("p-next").onclick=()=>{ planIdx++; renderPlan(); };
+
+/* ---- データ ---- */
+function download(text, name, type){
+ const blob=new Blob([text],{type});
+ const a=document.createElement("a"); a.href=URL.createObjectURL(blob); a.download=name; document.body.appendChild(a); a.click(); setTimeout(()=>{URL.revokeObjectURL(a.href); a.remove();},1000);
+}
+async function buildBackup(){ const env = await sealWith(sess, db); env.savedAt = new Date().toLocaleString("ja-JP"); return JSON.stringify(env); }
+async function buildBundle(){
+ const env = await buildBackup();
+ const tagRe = /(<script type="application\/json" id="embedded-data">)[\s\S]*?(<\/script>)/;
+ if(!tagRe.test(ORIGINAL_HTML)) throw new Error("ファイルの形が変わっているため作れません");
+ return ORIGINAL_HTML.replace(tagRe, (m,a,b)=> a + env.replace(/</g,"\\u003c") + b);
+}
+$("d-export").onclick=async()=>{
+ if(!sess) return;
+ download(await buildBackup(), `soko_backup_${todayStr()}.json`, "application/json");
+ alert("暗号化したJSONを書き出しました。読み込むときは、今のパスワードが要ります。");
+};
+$("d-bundle").onclick=async()=>{
+ if(!sess) return;
+ try{ download(await buildBundle(), `soko_data_${todayStr()}.html`, "text/html");
+  alert("データ込みのHTMLを保存しました。中のデータは暗号化されていて、開くときに今のパスワードが要ります。パスワードはファイルとは別の方法で伝えてください。"); }
+ catch(e){ alert("保存できませんでした: "+e.message); }
+};
+$("pw-change").onclick=async()=>{
+ const cur=$("pw-cur").value, a=$("pw-new").value, c=$("pw-new2").value, msg=$("pw-msg");
+ if(a.length<8) return msg.innerHTML=`<div class="warnbox">新しいパスワードは8文字以上にしてください</div>`;
+ if(a!==c) return msg.innerHTML=`<div class="warnbox">新しいパスワードが2つ同じではありません</div>`;
+ msg.innerHTML=`<div class="muted">確認中…</div>`;
+ try{ await openEnv(readEnc(), cur); }catch(e){ await sleep(800); return msg.innerHTML=`<div class="warnbox">今のパスワードがちがいます</div>`; }
+ await saveQ;
+ sess = await newSession(a); await save();
+ ["pw-cur","pw-new","pw-new2"].forEach(i=>$(i).value="");
+ msg.innerHTML=`<div class="okbox">パスワードを変更して、データを新しいパスワードで暗号化しなおしました。</div>`;
+};
+$("lockbtn").onclick=()=>lock("ロックしました。");
+$("d-import").onclick=()=>$("d-file").click();
+$("d-file").onchange=ev=>{
+ const f=ev.target.files[0]; if(!f) return;
+ const rd=new FileReader();
+ rd.onload=async()=>{ try{ let d=JSON.parse(rd.result);
+   if(d && d.app==="soko" && d.ct){
+    const pw = await askPassword("暗号化されたバックアップ", "このファイルを書き出したときのパスワードを入れてください。");
+    if(pw===null) return;
+    try{ d = (await openEnv(d, pw)).db; }catch(e){ await sleep(800); throw new Error(e.badpw ? "パスワードがちがいます" : e.message); }
+   } else if(d && Array.isArray(d.varieties)){
+    if(!confirm("このファイルは暗号化されていない古い形式です。読み込むと、今のパスワードで暗号化して保存します。続けますか？")) return;
+   }
+   if(!d || !Array.isArray(d.varieties)||!Array.isArray(d.entries)) throw new Error("形式がちがいます");
+   if(!confirm(`品種${d.varieties.length}件・入出荷${d.entries.length}件を読み込みます。今のデータは置きかわります。よろしいですか？`)) return;
+   d.seq = d.seq || (Math.max(0,...d.entries.map(e=>e.seq||0))+1); d.entries.forEach((e,i)=>{ if(e.seq==null) e.seq=i+1; });
+   db=d; save(); planIdx=null; resetVForm(); alert("読み込みました"); render();
+  }catch(e){ alert("読み込めませんでした: "+e.message); } finally { $("d-file").value=""; } };
+ rd.readAsText(f);
+};
+$("d-reset").onclick=()=>{ if(!confirm("品種と入出荷のデータを全部消します。元に戻せません（必要なら先にJSONに書き出してください）。本当にリセットしますか？")) return; db=emptyDb(); save(); planIdx=null; resetVForm(); render(); };
+$("d-sample").onclick=()=>{
+ if(db.varieties.length || db.entries.length){ if(!confirm("今のデータは消えて、サンプルデータに入れかわります（必要なら先にJSONに書き出してください）。よろしいですか？")) return; }
+ db=sampleDb(); save(); planIdx=null; resetVForm(); showTab("plan");
+};
+$("d-clearsample").onclick=clearSample;
+function clearSample(){
+ if(!hasSample()){ alert("サンプルデータは入っていません"); return; }
+ if(!confirm("サンプルデータ（例の品種と入出荷）を消します。よろしいですか？")) return;
+ const ids=new Set(db.varieties.filter(v=>v.sample).map(v=>v.id));
+ db.varieties=db.varieties.filter(v=>!v.sample); db.entries=db.entries.filter(e=>!e.sample && !ids.has(e.vid));
+ save(); planIdx=null; resetVForm(); render();
+}
+function sampleDb(){
+ const d=emptyDb();
+ const V=[["a米",70,"大量入荷予定の例",true],["b米",60,"",false],["c米",50,"",false],["d米",90,"",false],["e米",75,"",false]];
+ const ids={};
+ V.forEach(([name,polish,memo,bulk],i)=>{ const id="s"+i; ids[name]=id; d.varieties.push({id,name:name,polish,color:PAL[i],memo:"サンプル"+(memo?"・"+memo:""),bulk,sample:true}); });
+ const E=[
+  ["2026-10-01","a米","in",6000],["2026-10-01","b米","in",3200],["2026-10-01","c米","in",1800],
+  ["2026-10-02","d米","in",1450],["2026-10-02","b米","out",812.5],["2026-10-02","e米","in",760],
+  ["2026-10-03","a米","in",7250],["2026-10-03","c米","out",333.3],["2026-10-03","a米","out",1180],
+  ["2026-10-04","b米","out",1500],["2026-10-04","c米","in",1200],["2026-10-04","e米","out",260],
+  ["2026-10-05","a米","out",5500],["2026-10-05","a米","in",3000],["2026-10-05","d米","out",950.75],
+ ];
+ E.forEach(([date,n,type,kg])=>d.entries.push({id:uid(),seq:d.seq++,date,vid:ids[n],type,kg,memo:"",sample:true}));
+ return d;
+}
+
+lockScreen();
+</script>
+</body>
+</html>
